@@ -1,0 +1,296 @@
+---
+title: "pset-3"
+author: "Blake Hartung, Yiran Shu"
+date: "10/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.width = 8,
+                      fig.height = 8)
+library(GGally)
+library(tidyverse)
+library(plotly)
+
+```
+
+### 1. Crime
+[10 points]
+
+Data source: [https://data.ny.gov/Public-Safety/Index-Crimes-by-County-and-Agency-Beginning-1990/ca8h-8gjq]
+
+```{r}
+df <- read_csv("https://data.ny.gov/api/views/ca8h-8gjq/rows.csv")
+
+df_2020_grouped <- df %>%
+  filter(Year == 2020) %>%
+  group_by(County, Region) %>%
+  summarise(murder = sum(Murder),
+            rape = sum(Rape),
+            robbery = sum(Robbery),
+            aggravated_assault = sum(`Aggravated Assault`),
+            burglary = sum(Burglary),
+            larceny = sum(Larceny),
+            motor_theft = sum(`Motor Vehicle Theft`),
+            total = sum(`Index Total`)
+            ) %>%
+  arrange(desc(total)) %>%
+  mutate(cat = case_when(Region == 'New York City' ~ 0,
+                         Region == 'Non-New York City' ~ 1))
+
+simple_graph <- GGally::ggparcoord(data = df_2020_grouped,
+                                   columns = 3:9,
+                                   scale = 'globalminmax',
+                                   order = c(8, 6, 7, 9, 5, 4, 3),
+                                   title = "Simple Unscaled Graph") +
+  xlab("Crime") +
+  ylab("Number Reported")
+
+complicated_graph <- GGally::ggparcoord(data = df_2020_grouped,
+                                        columns = 3:9,
+                                        scale = 'std',
+                                        showPoints = T,
+                                        alphaLines = 0.4,
+                                        order = c(8, 6, 7, 9, 5, 4, 3),
+                                        title = "Complicated Graph Scaled",
+                                        splineFactor = T) +
+  xlab("Crime") +
+  ylab("Number Reported - mean / std")
+
+interactive_graph <- df_2020_grouped %>%
+  plotly::plot_ly(type = 'parcoords',
+                  line = list(color = ~cat,
+                             colorscale = list(c(0, 'red'),
+                                               c(1, 'blue'))),
+                  dimensions = list(
+                   list(range = c(0, 33000),
+                        label = 'Larceny', values= ~larceny),
+                   list(range = c(0, 10000),
+                        label = 'Aggravated Assault', values= ~aggravated_assault),
+                   list(range = c(0, 5500),
+                        label = 'Burglary', values= ~burglary),
+                   list(range = c(0, 4000),
+                        label = 'Motor Theft', values= ~motor_theft),
+                   list(range = c(0, 4000),
+                        label = 'Robbery', values= ~robbery),
+                   list(range = c(0, 750),
+                        label = 'Rape', values= ~rape),
+                   list(range = c(0, 200),
+                        label = 'Murder', values= ~murder)
+                 )) %>%
+  layout(title = 'NY State Crime by County (NYC Counties in Red)',
+         yaxis = list(title = 'No. of Crimes Reported'),
+         xaxis = list(title = 'Crime'))
+```
+
+a) Create a parallel coordinates plot showing the number of crimes in each of the categories listed for 2020. Show actual counts; do not rescale. Your graph should have one line for each county in New York State. (Use `GGally::ggparcoord()`)
+
+```{r}
+simple_graph
+```
+
+Altered graph to show crimes in descending order from right to left.
+
+
+b) Now experiment with alpha blending, splines, and rescaling to create the clearest version of the plot that you can. What patterns do you observe? (Use `GGally::ggparcoord()`)
+
+``` {r}
+complicated_graph
+```
+
+The above graph uses the standard scale in the GGAlly `ggparcoord` plotting function (subtract mean and divide by standard deviation). The spline factors have been used, but may be misleading as splining may represent some sort of continuity between the categorical variables, which is generally not good practice.
+
+As Far as the information within the graph, we see that most of the counties within the State have a very low crime rate relative to the few outlying counties with large amounts of crime. We believe this may have something to do with the population of these counties relative to one another, as New York county will have a population (and hence crime) much popular than a county upstate.
+
+c) Create an interactive parallel coordinates plot of the same data, coloring by Region. Discuss outliers, clusters, and correlations in detail.
+
+``` {r}
+interactive_graph
+```
+
+The above interactive graph shows New York City Counties in Red and Non-New York City Counties in Blue. Here, we see that new York City Counties are clearly the most prolific crime areas in the state, as mentioned earlier this could have to do with the large population of the area.
+Notes:
+ - In Non-New York City Counties, there seems to be a large drop in aggravated assault in comparison to New York City Counties.
+ - In Comparison to Motor Theft and Burglary, Robbery is very prolific in New York City Counties.
+ - There is a major outlier in Non-New York City Counties, which turns out to be another highly populated county upstate (Erie County, home of Buffalo)
+ - The Outlying New York City County is Richmond (Staten Island), which has a much lower population than the rest of the NYC Counties, with only around 500,000 people.
+
+### 2. Sleep
+
+[10 points]
+
+Data: `SleepStudy` from **Lock5withR** package
+
+Draw the following graphs and answer the questions.
+
+```{r}
+library(Lock5withR)
+data(SleepStudy)
+dat <- SleepStudy
+```
+
+
+
+a) Is there an association between `ClassYear` and `AnxietyStatus`? Between `ClassYear` and `NumEarlyClass`? Justify your answers with mosaic plots.
+```{r}
+library(cowplot)
+library(ggmosaic)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+
+fillcolors <- rev(brewer.pal(3, "Blues"))
+dat$AnxietyStatus <- factor(dat$AnxietyStatus, levels = c("severe", "moderate", "normal"))
+
+ggplot(data=dat) + 
+  geom_mosaic(aes(x=product(AnxietyStatus, ClassYear), fill=AnxietyStatus)) + 
+  scale_fill_manual(values = fillcolors) +
+  ggtitle("Mosiac Plot of AnxietyStatus and ClassYear") +
+  theme_classic()
+```
+
+```{r}
+fillcolors <- brewer.pal(6, "Reds")
+
+dat %>% 
+  mutate(NumOfEarlyClass=as.factor(NumEarlyClass)) %>% 
+  ggplot() + 
+  geom_mosaic(aes(x=product(ClassYear), fill=NumOfEarlyClass)) + 
+  scale_fill_manual(values = fillcolors) +
+  ggtitle("Mosiac Plot of NumEarlyClass and ClassYear") +
+  theme_classic()
+```
+
+Answer: According to the first mosaic plot, though it seems that more 3rd-year and 4th-year students suffer from severe anxiety, the differences between the proportions of severe anxiety and moderate anxiety are small. So there is not a strong association between `ClassYear` and `AnxietyStatus`. According to the second mosaic plut, as `ClassYear` increases, students tend to have less early classes.    
+
+
+
+b) Perform chi square tests to test for associations between the sets of variables graphed in part a). What are the results? Discuss in relation to the mosaic plots.
+
+```{r}
+library(stats)
+Xtest_anxiety_classyear <- chisq.test(table(dat$ClassYear, dat$AnxietyStatus), simulate.p.value=TRUE, correct = FALSE)
+Xtest_anxiety_classyear$p.value
+```
+```{r}
+Xtest_numearlyclass_classyear <- chisq.test(table(dat$ClassYear, dat$NumEarlyClass), simulate.p.value=TRUE, correct = FALSE)
+Xtest_numearlyclass_classyear$p.value
+```
+
+Answer: 
+
+The p-value of the chi square test for association between `ClassYear` and `AnxietyStatus` is about 0.60, which is much larger than 0.05. Therefore, at 5% significance level, there is no strong evidence to reject the null hypothesis, which indicates that `ClassYear` and `AnxietyStatus` are independent. The p-value of the chi square test for association between `ClassYear` and `NumEarlyClass` is about 0.0005, which is much less than 0.05. Therefore, at 5% significance level, the null hypothesis is rejected, which indicates that there is an association between `ClassYear` and `NumEarlyClass`.
+
+This result aligns well with my observation in part a)
+
+
+c) How is the relationship between anxiety status and number of early classes affected by class year? Create a mosaic plot showing all three variables, treating anxiety status as the dependent variable. Discuss the results. 
+
+```{r, fig.width=10, fig.height=6}
+library(vcd)
+library(vcdExtra)
+library(RColorBrewer)
+
+fillcolors <- brewer.pal(3, "Blues")
+dat$AnxietyStatus <- factor(dat$AnxietyStatus, levels = c("normal", "moderate", "severe"))
+mosaic(AnxietyStatus ~ ClassYear + NumEarlyClass, dat, direction = c("v", "v", "h"), highlighting_fill=fillcolors)
+
+```
+
+Answer: For each `ClassYear`, students who do not have early classes and who have 2 early classes are more likely to suffer from severe anxiety. Students who  have 4 or 5 early classes are more likely to suffer from moderate anxiety. 
+
+
+d) Use the base `pairs()` function to draw a mosaic pairs plot of all all categorical (factor) variables in `SleepStudy`. Based on the plot, list all pairs of variables from strongest association to weakest association. (Note: The **vcd** package must be loaded for `pairs()` to find the correct method.) Name a pair of variables which appear to have a very strong association. Name a pair of variables which appear not to be associated.
+
+```{r}
+dat$Gender <- as.factor(dat$Gender)
+dat$ClassYear <- as.factor(dat$ClassYear)
+dat$NumEarlyClass <- as.factor(dat$NumEarlyClass)
+dat$EarlyClass <- as.factor(dat$EarlyClass)
+dat$AllNighter <- as.factor(dat$AllNighter)
+```
+
+```{r, fig.width=14, fig.height=14}
+categorical_features <- c(1, 2, 3, 4, 5, 13, 14, 15, 18, 27, 28, 29, 30)
+pairs(table(dat[,categorical_features]), highlighting = 2)
+```
+
+
+
+```{r}
+len <- length(categorical_features)
+index <- 0
+df <- data.frame(matrix(ncol = 3, nrow = 0))
+x <- c("contingency", "first", "second")
+colnames(df) <- x
+
+for(i in 1:(len-1)) {
+  for(j in (i+1):len) {
+    index <- index + 1
+    df[index, 1] <- assocstats(table(dat[,categorical_features[i]], dat[,categorical_features[j]]))$cramer
+    df[index, 2] <- i
+    df[index, 3] <- j
+  }
+}
+
+df <- df[rev(order(df$contingency)),]
+len <- nrow(df)
+print("All pairs of variables from strongest association to weakest association: ")
+for(i in 1:len) {
+  print(colnames(dat)[categorical_features[c(df[i, 2], df[i, 3])]])
+}
+```
+
+Answer: I used `Gender`, `ClassYear`, `LarkOwl`, `NumEarlyClass`, `EarlyClass`, `DepressionStatus`, `AnxietyStatus`, `Stress`, `AlcoholUse`, `AllNighter`, `Sex`, `allNighter` and `earlyClass` as all categorical (factor) variables. `Allnighter` and `allnighter` appear to have very a strong association. `Stress` and `AllNighter` appear not to be associated.
+
+
+### 3. Wait List
+
+[10 points]
+
+The file `stats_wl.csv` contains information about waitlist movement for a Fall 2021 Columbia U undergraduate statistics class.
+
+There are 640 rows and 4 variables:
+
+`Name` name of student (actual names were replaced with names generated from the **randomNames** package)
+
+`Date` since SSOL updates overnight, waitlist positions were collected each morning during the change of program period
+
+`Priority` position in waitlist, for example `1` = top position on list
+
+`Status` final outcome, *Registered* = received a place in class and remained; *Dropped Class* = received a place in class and left; *Left List* = left waiting list; *Joined* = remained on waiting list at the end of the change of program period. (Note that the status reflects what ultimately happened, not what the status was on a particular date.)
+
+Create an alluvial diagram that shows waitlist movement during the change of program period. It is not necessary to include the `Name` column in the diagram, but it should be possible to observe movement of individual students: for example, that the student who was 22nd in the waitlist on Sept 9th moved up to 15th place on Sept 16th and then left the list.
+
+
+```{r, fig.width=13, fig.height=13}
+library(ggalluvial)
+
+dat <- read.csv("stats_wl.csv")
+df <- data.frame(matrix(ncol=14, nrow = 0))
+colnames(df) <- c("Name", "2021-09-09", "2021-09-10", "2021-09-11", "2021-09-12", "2021-09-13", "2021-09-14", "2021-09-15", "2021-09-16", "2021-09-17", "2021-09-18", "2021-09-19", "2021-09-20", "2021-09-21")
+names <- unique(dat$Name)
+index <- 1
+for(name in names) {
+  df[index, 1] <- name
+  
+  group <- dat[dat$Name == name, ]
+  for(i in 1:nrow(group)) {
+    df[[group[i, 2]]][index] <- group[i, 3]
+  }
+  
+  index <- index + 1
+}
+
+lodes_df <- to_lodes_form(df, axes = 2:14)
+
+ggplot(lodes_df, aes(alluvium = alluvium, x = x, stratum = stratum)) +
+  geom_alluvium(color = "blue") +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = paste(after_stat(stratum))))
+```
+
+Note that `NA` means that the student was not in the waitlist on that date.

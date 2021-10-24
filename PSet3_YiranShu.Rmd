@@ -1,0 +1,217 @@
+---
+title: "PSet 3"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# this prevents package loading message from appearing in the rendered version of your problem set
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+Note: Grading is based both on your graphs and verbal explanations. Follow all best practices *as discussed in class*, including choosing appropriate parameters for all graphs. *Do not expect the assignment questions to spell out precisely how the graphs should be drawn. Sometimes guidance will be provided, but the absense of guidance does not mean that all choices are ok.*
+
+Read *Graphical Data Analysis with R*, Chap. 6, 7
+
+
+
+### 1. Crime
+
+[10 points]
+
+Data source: https://data.ny.gov/Public-Safety/Index-Crimes-by-County-and-Agency-Beginning-1990/ca8h-8gjq
+
+You do not need to submit the data with your assignment. You may either download and read from your local copy or read directly from the web site with `df <- read_csv("https://data.ny.gov/api/views/ca8h-8gjq/rows.csv")
+`.
+
+a) Create a parallel coordinates plot showing the number of crimes in each of the categories listed for 2020. Show actual counts; do not rescale. Your graph should have one line for each county in New York State. (Use `GGally::ggparcoord()`)
+
+
+
+b) Now experiment with alpha blending, splines, and rescaling to create the clearest version of the plot that you can. What patterns do you observe? (Use `GGally::ggparcoord()`)
+
+
+c) Create an interactive parallel coordinates plot of the same data, coloring by `Region`. Discuss outliers, clusters, and correlations in detail.
+
+
+### 2. Sleep
+
+[10 points]
+
+Data: `SleepStudy` from **Lock5withR** package
+
+Draw the following graphs and answer the questions.
+
+```{r}
+library(Lock5withR)
+data(SleepStudy)
+dat <- SleepStudy
+```
+
+
+
+a) Is there an association between `ClassYear` and `AnxietyStatus`? Between `ClassYear` and `NumEarlyClass`? Justify your answers with mosaic plots.
+```{r}
+library(cowplot)
+library(ggmosaic)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+
+fillcolors <- rev(brewer.pal(3, "Blues"))
+dat$AnxietyStatus <- factor(dat$AnxietyStatus, levels = c("severe", "moderate", "normal"))
+
+ggplot(data=dat) + 
+  geom_mosaic(aes(x=product(AnxietyStatus, ClassYear), fill=AnxietyStatus)) + 
+  scale_fill_manual(values = fillcolors) +
+  ggtitle("Mosiac Plot of AnxietyStatus and ClassYear") +
+  theme_classic()
+```
+
+```{r}
+fillcolors <- brewer.pal(6, "Reds")
+
+dat %>% 
+  mutate(NumOfEarlyClass=as.factor(NumEarlyClass)) %>% 
+  ggplot() + 
+  geom_mosaic(aes(x=product(ClassYear), fill=NumOfEarlyClass)) + 
+  scale_fill_manual(values = fillcolors) +
+  ggtitle("Mosiac Plot of NumEarlyClass and ClassYear") +
+  theme_classic()
+```
+
+Answer: According to the first mosaic plot, though it seems that more 3rd-year and 4th-year students suffer from severe anxiety, the differences between the proportions of severe anxiety and moderate anxiety are small. So there is not a strong association between `ClassYear` and `AnxietyStatus`. According to the second mosaic plut, as `ClassYear` increases, students tend to have less early classes.    
+
+
+
+b) Perform chi square tests to test for associations between the sets of variables graphed in part a). What are the results? Discuss in relation to the mosaic plots.
+
+```{r}
+library(stats)
+Xtest_anxiety_classyear <- chisq.test(table(dat$ClassYear, dat$AnxietyStatus), simulate.p.value=TRUE, correct = FALSE)
+Xtest_anxiety_classyear$p.value
+```
+```{r}
+Xtest_numearlyclass_classyear <- chisq.test(table(dat$ClassYear, dat$NumEarlyClass), simulate.p.value=TRUE, correct = FALSE)
+Xtest_numearlyclass_classyear$p.value
+```
+
+Answer: 
+
+The p-value of the chi square test for association between `ClassYear` and `AnxietyStatus` is about 0.60, which is much larger than 0.05. Therefore, at 5% significance level, there is no strong evidence to reject the null hypothesis, which indicates that `ClassYear` and `AnxietyStatus` are independent. The p-value of the chi square test for association between `ClassYear` and `NumEarlyClass` is about 0.0005, which is much less than 0.05. Therefore, at 5% significance level, the null hypothesis is rejected, which indicates that there is an association between `ClassYear` and `NumEarlyClass`.
+
+This result aligns well with my observation in part a)
+
+
+c) How is the relationship between anxiety status and number of early classes affected by class year? Create a mosaic plot showing all three variables, treating anxiety status as the dependent variable. Discuss the results. 
+
+```{r, fig.width=10, fig.height=6}
+library(vcd)
+library(vcdExtra)
+library(RColorBrewer)
+
+fillcolors <- brewer.pal(3, "Blues")
+dat$AnxietyStatus <- factor(dat$AnxietyStatus, levels = c("normal", "moderate", "severe"))
+mosaic(AnxietyStatus ~ ClassYear + NumEarlyClass, dat, direction = c("v", "v", "h"), highlighting_fill=fillcolors)
+
+```
+
+Answer: For each `ClassYear`, students who do not have early classes and who have 2 early classes are more likely to suffer from severe anxiety. Students who  have 4 or 5 early classes are more likely to suffer from moderate anxiety. 
+
+
+d) Use the base `pairs()` function to draw a mosaic pairs plot of all all categorical (factor) variables in `SleepStudy`. Based on the plot, list all pairs of variables from strongest association to weakest association. (Note: The **vcd** package must be loaded for `pairs()` to find the correct method.) Name a pair of variables which appear to have a very strong association. Name a pair of variables which appear not to be associated.
+
+```{r}
+dat$Gender <- as.factor(dat$Gender)
+dat$ClassYear <- as.factor(dat$ClassYear)
+dat$NumEarlyClass <- as.factor(dat$NumEarlyClass)
+dat$EarlyClass <- as.factor(dat$EarlyClass)
+dat$AllNighter <- as.factor(dat$AllNighter)
+```
+
+```{r, fig.width=14, fig.height=14}
+categorical_features <- c(1, 2, 3, 4, 5, 13, 14, 15, 18, 27, 28, 29, 30)
+pairs(table(dat[,categorical_features]), highlighting = 2)
+```
+
+
+
+```{r}
+len <- length(categorical_features)
+index <- 0
+df <- data.frame(matrix(ncol = 3, nrow = 0))
+x <- c("contingency", "first", "second")
+colnames(df) <- x
+
+for(i in 1:(len-1)) {
+  for(j in (i+1):len) {
+    index <- index + 1
+    df[index, 1] <- assocstats(table(dat[,categorical_features[i]], dat[,categorical_features[j]]))$cramer
+    df[index, 2] <- i
+    df[index, 3] <- j
+  }
+}
+
+df <- df[rev(order(df$contingency)),]
+len <- nrow(df)
+print("All pairs of variables from strongest association to weakest association: ")
+for(i in 1:len) {
+  print(colnames(dat)[categorical_features[c(df[i, 2], df[i, 3])]])
+}
+```
+
+Answer: I used `Gender`, `ClassYear`, `LarkOwl`, `NumEarlyClass`, `EarlyClass`, `DepressionStatus`, `AnxietyStatus`, `Stress`, `AlcoholUse`, `AllNighter`, `Sex`, `allNighter` and `earlyClass` as all categorical (factor) variables. `Allnighter` and `allnighter` appear to have very a strong association. `Stress` and `AllNighter` appear not to be associated.
+
+
+### 3. Wait List
+
+[10 points]
+
+The file `stats_wl.csv` contains information about waitlist movement for a Fall 2021 Columbia U undergraduate statistics class.
+
+There are 640 rows and 4 variables:
+
+`Name` name of student (actual names were replaced with names generated from the **randomNames** package)
+
+`Date` since SSOL updates overnight, waitlist positions were collected each morning during the change of program period
+
+`Priority` position in waitlist, for example `1` = top position on list
+
+`Status` final outcome, *Registered* = received a place in class and remained; *Dropped Class* = received a place in class and left; *Left List* = left waiting list; *Joined* = remained on waiting list at the end of the change of program period. (Note that the status reflects what ultimately happened, not what the status was on a particular date.)
+
+Create an alluvial diagram that shows waitlist movement during the change of program period. It is not necessary to include the `Name` column in the diagram, but it should be possible to observe movement of individual students: for example, that the student who was 22nd in the waitlist on Sept 9th moved up to 15th place on Sept 16th and then left the list.
+
+
+```{r, fig.width=13, fig.height=13}
+library(ggalluvial)
+
+dat <- read.csv("stats_wl.csv")
+df <- data.frame(matrix(ncol=14, nrow = 0))
+colnames(df) <- c("Name", "2021-09-09", "2021-09-10", "2021-09-11", "2021-09-12", "2021-09-13", "2021-09-14", "2021-09-15", "2021-09-16", "2021-09-17", "2021-09-18", "2021-09-19", "2021-09-20", "2021-09-21")
+names <- unique(dat$Name)
+index <- 1
+for(name in names) {
+  df[index, 1] <- name
+  
+  group <- dat[dat$Name == name, ]
+  for(i in 1:nrow(group)) {
+    df[[group[i, 2]]][index] <- group[i, 3]
+  }
+  
+  index <- index + 1
+}
+
+lodes_df <- to_lodes_form(df, axes = 2:14)
+
+ggplot(lodes_df, aes(alluvium = alluvium, x = x, stratum = stratum)) +
+  geom_alluvium(color = "blue") +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = paste(after_stat(stratum))))
+```
+
+Note that `NA` means that the student was not in the waitlist on that date.
+
+
+
+
+
